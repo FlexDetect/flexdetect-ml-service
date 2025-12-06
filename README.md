@@ -26,7 +26,6 @@ Obdelava in analiza uvoženih podatkov z uporabo naprednih modelov strojnega uč
 ---
 
 ## Arhitektura
-- **Jezik:** Python 3.10
 - **Okvir:** TensorFlow, scikit-learn, PyTorch
 - **Okolje:** Google Cloud Functions za skalabilno izvajanje
 - **Podpora:** REST API za prejem podatkov in vračanje rezultatov
