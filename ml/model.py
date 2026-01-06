@@ -1,3 +1,4 @@
+import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 
@@ -15,14 +16,13 @@ def add_time_features(df):
 
     return df
 
-def compute_baseline(df):
-    # baseline indexed by (weekday, slot)
+def compute_baseline(df, q=0.7):
     baseline = {}
 
     grouped = df.groupby(["weekday", "slot"])
 
     for (weekday, slot), group in grouped:
-        baseline[(weekday, slot)] = group["power"].median()
+        baseline[(weekday, slot)] = group["power"].quantile(q)
 
     return baseline
 
@@ -47,10 +47,20 @@ def median_absolute_deviation(series):
     return np.median(deviations)
 
 def compute_threshold(df, k=3.0):
+    r = df["residual"]
+    r = r[r != 0]
+
+    if len(r) == 0:
+        return 0.0
+
+    mad = median_absolute_deviation(r)
+    return k * mad
+"""
+def compute_threshold(df, k=3.0):
     mad = median_absolute_deviation(df["residual"])
     threshold = k * mad
     return threshold
-    
+"""    
 def detect_dr_flag(df, threshold):
     df = df.copy()
     df["dr_flag"] = 0
@@ -92,7 +102,7 @@ def group_events(df):
                 "start": time,
                 "end": time,
                 "flag": flag,
-                "energy_kwh": 0.0
+                "energy_kwh": abs(df.at[i, "residual"]) * 0.25
             }
 
         elif flag != 0 and current_event is not None:
@@ -185,7 +195,7 @@ def detect_dr(df):
     df = add_time_features(df)
 
     # Baseline
-    baseline = compute_baseline(df)
+    baseline = compute_baseline(df, q=0.7)
     df = apply_baseline(df, baseline)
 
     # Residual
@@ -198,29 +208,64 @@ def detect_dr(df):
 
     # DR detection
     threshold = compute_threshold(df)
+    print(threshold)
     df = detect_dr_flag(df, threshold)
     df = compute_dr_capacity(df)
+    print(df["residual"].describe())
 
     # Events
     events = group_events(df)
 
     return df, events, selected
 
+def filter_short_events(events, min_steps=2):
+    filtered = []
+
+    for e in events:
+        duration_steps = int(
+            (e["end"] - e["start"]).total_seconds() / (15 * 60)
+        ) + 1
+
+        if duration_steps >= min_steps:
+            filtered.append(e)
+
+    return filtered
+
+    
 if __name__ == "__main__":
 
-    # load data
-    df = pd.read_csv("data.csv")
-
-    # parse timestamp
+    df = pd.read_csv("training_data_a.csv")
     df["timestamp"] = pd.to_datetime(df["timestamp"])
 
-    # run DR detection
     df_out, events, selected_features = detect_dr(df)
+    events = filter_short_events(events, min_steps=2)
 
-    # inspect results
     print("Selected features:", selected_features)
     print("Number of events:", len(events))
 
-    if events:
-        print("First event:", events[0])
+    # Print first 10 events
+    for i, event in enumerate(events[:30]):
+        print(f"Event {i+1}: {event}")
+
+    # Plot full timeline
+    plt.figure(figsize=(16, 6))
+
+    plt.plot(df_out["timestamp"][:5000], df_out["power"][:5000], label="power", alpha=0.7)
+    plt.plot(df_out["timestamp"][:5000], df_out["baseline_power"][:5000], label="baseline", linewidth=2)
+    """
+    # Highlight DR events
+    for event in events:
+        plt.axvspan(
+            event["start"],
+            event["end"],
+            color="red" if event["flag"] == -1 else "green",
+            alpha=0.15
+        )"""
+
+    plt.xlabel("Time")
+    plt.ylabel("Power (kW)")
+    plt.title("Demand Response Detection – Full Timeline")
+    plt.legend()
+    plt.tight_layout()
+    plt.show()
 
