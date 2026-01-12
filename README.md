@@ -1,77 +1,95 @@
-
 # FlexDetect Machine Learning Service
 
 ## Vsebina
-- [Namen mikrostoritve](#namen-mikrostoritve)
-- [Modeli in algoritmi](#modeli-in-algoritmi)
-- [Arhitektura](#arhitektura)
-- [Vhodni in izhodni podatki](#vhodni-in-izhodni-podatki)
-- [API specifikacija](#api-specifikacija)
-- [Primeri zahtevkov](#primeri-zahtevkov)
-- [Integracija](#integracija)
-- [Razvojne smernice](#razvojne-smernice)
+- Namen mikrostoritve
+- Funkcionalnost in logika
+- Arhitektura
+- Vhodni in izhodni podatki
+- API specifikacija
+- Primer zahtevka
+- Integracija z drugimi mikrostoritvami
+- Razvojne opombe
 
 ---
 
 ## Namen mikrostoritve
-Obdelava in analiza uvoženih podatkov z uporabo naprednih modelov strojnega učenja za zaznavo dogodkov odziva na povpraševanje in oceno njihovega vpliva na porabo energije.
+
+Mikrostoritev **FlexDetect ML Service** izvaja zaznavo dogodkov energetske prilagodljivosti (Demand Response – DR) na podlagi časovnih vrst meritev porabe energije.
+
+Storitev:
+- pridobi meritve iz **data-service**,
+- izvede analizo časovne vrste,
+- zazna potencialne DR dogodke,
+- izračuna osnovne povzetke,
+- rezultate vrne prek REST API-ja.
 
 ---
 
-## Modeli in algoritmi
-- Metode nadziranega učenja: Random Forest, Gradient Boosting
-- Prilagojeni algoritmi za detekcijo anomalij
-- Avtomatska optimizacija hiperparametrov
+## Funkcionalnost in logika
+
+Logika zaznavanja temelji na:
+- osnovni obdelavi časovne vrste,
+- izračunu baseline porabe,
+- primerjavi dejanske porabe z baseline,
+- zaznavi intervalov z večjim odstopanjem.
+
+Model ni učeč (brez treniranja); uporablja deterministične metode, implementirane v `model.py`.
 
 ---
 
 ## Arhitektura
-- **Okvir:** TensorFlow, scikit-learn, PyTorch
-- **Okolje:** Google Cloud Functions za skalabilno izvajanje
-- **Podpora:** REST API za prejem podatkov in vračanje rezultatov
+
+- Jezik: Python 3  
+- API okvir: FastAPI  
+- Obdelava podatkov: pandas  
+- Komunikacija: REST (JSON)  
+- Zagon: Docker / Azure Container Apps  
+
+Storitev je stateless.
 
 ---
 
 ## Vhodni in izhodni podatki
-- **Vhod:** Časovne vrste očiščenih podatkov in metapodatki
-- **Izhod:** Identifikacija dogodkov, trajanje, magnitude odziva, verjetnosti
+
+### Vhod
+Storitev sprejme ID-je podatkovnih nizov in meritev, nato podatke pridobi iz data-service.
+
+### Izhod
+- zaznani DR dogodki,
+- časovna vrsta z oznakami dogodkov,
+- osnovni povzetek zaznave.
 
 ---
 
 ## API specifikacija
 
-| Endpoint             | Metoda | Opis                                 |
-|----------------------|--------|-------------------------------------|
-| `/ml/run`            | POST   | Zažene analizo in napoved            |
-| `/ml/status/{id}`    | GET    | Pridobi status izvajanja modela      |
-| `/ml/results/{id}`   | GET    | Pridobi rezultate analize             |
-
----
-
-## Primeri zahtevkov
+### POST /detect
 
 ```json
 {
-  "dataId": "67890",
-  "parameters": {
-    "model": "random_forest",
-    "threshold": 0.7
-  }
+  "dataset_id": 1,
+  "power_measurement_id": 10,
+  "feature_measurement_ids": [11, 12]
 }
 ```
 
 ---
 
-## Integracija
-- Prejem očiščenih podatkov iz **flexdetect-data-service**
-- Posredovanje rezultatov mikrostoritvi **flexdetect-visualization-service**
-- Uporabniški dostop preko **flexdetect-user-service**
+## Integracija z drugimi mikrostoritvami
+
+- Data Service: pridobivanje meritev
+- Frontend: prikaz rezultatov
+- User Service: JWT avtentikacija
+
 ---
 
-## Razvojne smernice
-- Redno treniranje modelov z novimi podatki
-- Spremljanje metrike učinkovitosti in natančnosti modelov
+## Razvojne opombe
+
+- Brez persistentnega stanja
+- Nastavljiv timeout za klic data-service
+- Namenjeno demonstraciji zaznave DR dogodkov
+
 ---
 
-**Avtor:** Aljaž Brodar  
-**Zadnja posodobitev:** 1. december 2025
+Avtor: Aljaž Brodar  
+Zadnja posodobitev: 12. januar 2026
