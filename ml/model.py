@@ -1,4 +1,3 @@
-import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 
@@ -26,15 +25,22 @@ def compute_baseline(df, q=0.7):
 
     return baseline
 
+# model.py — replace apply_baseline with this
 def apply_baseline(df, baseline):
     df = df.copy()
     df["baseline_power"] = 0.0
 
     for i in range(len(df)):
         key = (df.at[i, "weekday"], df.at[i, "slot"])
-        df.at[i, "baseline_power"] = baseline[key]
+        val = baseline.get(key, 0.0)
+        # guard against NaN baseline values
+        if pd.isna(val):
+            val = 0.0
+        df.at[i, "baseline_power"] = float(val)
 
     return df
+
+
 
 def compute_residual(df):
     df = df.copy()
@@ -60,7 +66,7 @@ def compute_threshold(df, k=3.0):
     mad = median_absolute_deviation(df["residual"])
     threshold = k * mad
     return threshold
-"""    
+"""
 def detect_dr_flag(df, threshold):
     df = df.copy()
     df["dr_flag"] = 0
@@ -205,7 +211,7 @@ def detect_dr(df):
     candidates = get_candidate_features(df)
     selected = select_useful_features(df, candidates)
     df = correct_residual(df, selected)
-
+    df = df.replace([np.inf, -np.inf], np.nan)
     # DR detection
     threshold = compute_threshold(df)
     print(threshold)
@@ -231,7 +237,7 @@ def filter_short_events(events, min_steps=2):
 
     return filtered
 
-    
+
 if __name__ == "__main__":
 
     df = pd.read_csv("training_data_a.csv")
@@ -246,26 +252,4 @@ if __name__ == "__main__":
     # Print first 10 events
     for i, event in enumerate(events[:30]):
         print(f"Event {i+1}: {event}")
-
-    # Plot full timeline
-    plt.figure(figsize=(16, 6))
-
-    plt.plot(df_out["timestamp"][:5000], df_out["power"][:5000], label="power", alpha=0.7)
-    plt.plot(df_out["timestamp"][:5000], df_out["baseline_power"][:5000], label="baseline", linewidth=2)
-    """
-    # Highlight DR events
-    for event in events:
-        plt.axvspan(
-            event["start"],
-            event["end"],
-            color="red" if event["flag"] == -1 else "green",
-            alpha=0.15
-        )"""
-
-    plt.xlabel("Time")
-    plt.ylabel("Power (kW)")
-    plt.title("Demand Response Detection – Full Timeline")
-    plt.legend()
-    plt.tight_layout()
-    plt.show()
 
